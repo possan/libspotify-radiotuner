@@ -36,11 +36,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
-
 #include <libspotify/api.h>
-
 #include "audio.h"
-
+#include <termios.h>
+#include "hardware.h"
+#include "tuner.h"
+#include "statics.h"
 
 /* --- Data --- */
 /// The application key is specific to each project, and allows Spotify
@@ -50,7 +51,16 @@ extern const uint8_t g_appkey[];
 extern const size_t g_appkey_size;
 
 /// The output queue for audo data
+
+static audio_fifo_t g_musicfifo;
+
+static audio_fifo_t g_staticfifo1;
+static audio_fifo_t g_staticfifo2;
+static audio_fifo_t g_staticfifo3;
+
 static audio_fifo_t g_audiofifo;
+
+
 /// Synchronization mutex for the main thread
 static pthread_mutex_t g_notify_mutex;
 /// Synchronization condition variable for the main thread
@@ -71,6 +81,21 @@ static int g_remove_tracks = 0;
 static sp_track *g_currenttrack;
 /// Index to the next track
 static int g_track_index;
+
+
+
+
+
+static STATICSTATE g_static1;
+static STATICSTATE g_static2;
+static STATICSTATE g_static3;
+
+static TUNER g_tuner;
+
+
+
+
+
 
 
 /**
@@ -308,6 +333,7 @@ static void logged_in(sp_session *sess, sp_error error)
 		&pc_callbacks,
 		NULL);
 
+	hardware_banner("logged in.", 200);
 	printf("jukebox: Looking at %d playlists\n", sp_playlistcontainer_num_playlists(pc));
 
 	for (i = 0; i < sp_playlistcontainer_num_playlists(pc); ++i) {
@@ -351,7 +377,7 @@ static void notify_main_thread(sp_session *sess)
 static int music_delivery(sp_session *sess, const sp_audioformat *format,
                           const void *frames, int num_frames)
 {
-	audio_fifo_t *af = &g_audiofifo;
+	audio_fifo_t *af = &g_musicfifo;
 	audio_fifo_data_t *afd;
 	size_t s;
 
@@ -424,6 +450,10 @@ static void metadata_updated(sp_session *sess)
 static void play_token_lost(sp_session *sess)
 {
 	audio_fifo_flush(&g_audiofifo);
+//	audio_fifo_flush(&g_audiofifo);
+//	audio_fifo_flush(&g_audiofifo);
+//	audio_fifo_flush(&g_audiofifo);
+//	audio_fifo_flush(&g_audiofifo);
 
 	if (g_currenttrack != NULL) {
 		sp_session_player_unload(g_sess);
@@ -493,6 +523,71 @@ static void usage(const char *progname)
 	fprintf(stderr, "warning: -d will delete the tracks played from the list!\n");
 }
 
+void peek_input() {
+ 	int c = getchar();
+ 	float f;
+	switch (c) {
+		case 'f': hardware_fire_event(HE_FREQ_DOWN); break;
+		case 'F': hardware_fire_event(HE_FREQ_UP); break;
+		case 'v': hardware_fire_event(HE_VOL_DOWN); break;
+		case 'V': hardware_fire_event(HE_VOL_UP); break;
+		case 'x': hardware_fire_event(HE_X_DOWN); break;
+		case 'X': hardware_fire_event(HE_X_UP); break;
+		case ' ': hardware_fire_event(HE_PLAY_PAUSE); break;
+		case 'n': hardware_fire_event(HE_SKIP_NEXT); break;
+		case '1': static_setvolume(g_static1, static_getvolume(g_static1) + 0.1); break;
+		case 'q': static_setvolume(g_static1, static_getvolume(g_static1) - 0.1); break;
+		case '2': static_setvolume(g_static2, static_getvolume(g_static2) + 0.1); break;
+		case 'w': static_setvolume(g_static2, static_getvolume(g_static2) - 0.1); break;
+		case '3': static_setvolume(g_static3, static_getvolume(g_static3) + 0.1); break;
+		case 'e': static_setvolume(g_static3, static_getvolume(g_static3) - 0.1); break;
+		default: printf("unhandled character '%c' #%d\n", c, c); break;
+	}
+}
+
+void _hardware_event(int event) {
+	switch(event) {
+		case HE_FREQ_UP: tuner_tune_by(g_tuner, 1); break;
+		case HE_FREQ_DOWN: tuner_tune_by(g_tuner, -1); break;
+		case HE_PLAY_PAUSE: break;
+		case HE_SKIP_PREV: break;
+		case HE_SKIP_NEXT: break;
+	}
+}
+
+void inputloop(void *arg) {
+	printf("in inputloop 0x%X\n", arg);
+
+	static struct termios oldt, newt;
+	tcgetattr( STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON);
+	tcsetattr( STDIN_FILENO, TCSANOW, &newt);
+
+	while(1) {
+		peek_input();
+	}
+	return NULL;
+}
+
+void staticloop(void *arg) {
+	// printf("in inputloop 0x%X\n", arg);
+
+	sp_audioformat f;
+	f.channels = 2;
+	f.sample_rate = 44100;
+
+	while(1) {
+
+		static_generate( g_static1, &f, &g_musicfifo, &g_staticfifo1 );
+		static_generate( g_static2, &f, &g_staticfifo1, &g_staticfifo2 );
+		static_generate( g_static3, &f, &g_staticfifo2, &g_audiofifo );
+// 		static_generate( g_static1, &f, , g_staticfifo1 );
+	}
+
+	return NULL;
+}
+
 int main(int argc, char **argv)
 {
 	sp_session *sp;
@@ -530,6 +625,28 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	hardware_start();
+	hardware_banner("welcome.", 200);
+	hardware_set_callback(_hardware_event);
+
+	g_static1 = static_init(30);
+	g_static2 = static_init(100);
+	g_static3 = static_init(250);
+
+	static_setvolume(g_static1, 0.5);
+
+	g_tuner = tuner_init();
+	tuner_addchannel(g_tuner, 10, "Channel 1", "uri1");
+	tuner_addchannel(g_tuner, 33, "Channel 2", "uri2");
+	tuner_addchannel(g_tuner, 50, "Channel 3", "uri3");
+	tuner_addchannel(g_tuner, 70, "Channel 4", "uri4");
+	tuner_addchannel(g_tuner, 80, "Channel 5", "uri5");
+
+	audio_fifo_reset(&g_musicfifo);
+	audio_fifo_reset(&g_staticfifo1);
+	audio_fifo_reset(&g_staticfifo2);
+	audio_fifo_reset(&g_staticfifo3);
+
 	audio_init(&g_audiofifo);
 
 	/* Create session */
@@ -551,10 +668,17 @@ int main(int argc, char **argv)
 	sp_session_login(sp, username, password, 0, NULL);
 	pthread_mutex_lock(&g_notify_mutex);
 
+	static pthread_t id;
+	pthread_create(&id, NULL, inputloop, NULL);
+
+	static pthread_t id2;
+	pthread_create(&id2, NULL, staticloop, NULL);
+
 	for (;;) {
 		if (next_timeout == 0) {
-			while(!g_notify_do)
+			while(!g_notify_do) {
 				pthread_cond_wait(&g_notify_cond, &g_notify_mutex);
+			}
 		} else {
 			struct timespec ts;
 

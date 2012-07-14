@@ -16,13 +16,13 @@ endif
 
 TARGET = jukebox
 ## TARGET = playtrack
-OBJS = $(TARGET).o appkey.o $(AUDIO_DRIVER)-audio.o audio.o
+OBJS = $(TARGET).o appkey.o $(AUDIO_DRIVER)-audio.o audio.o tuner.o hardware.o statics.o
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 ifdef DEBUG
 ifeq ($(shell uname),Darwin)
-	install_name_tool -change @loader_path/../Frameworks/libspotify.framework/libspotify @rpath/libspotify.so $@
+#	install_name_tool -change @loader_path/../Frameworks/libspotify.framework/libspotify @rpath/libspotify.so $@
 endif
 endif
 
@@ -35,5 +35,8 @@ alsa-audio.o: alsa-audio.c audio.h
 dummy-audio.o: dummy-audio.c audio.h
 osx-audio.o: osx-audio.c audio.h
 openal-audio.o: openal-audio.c audio.h
-jukebox.o: jukebox.c audio.h
+jukebox.o: jukebox.c audio.h hardware.h tuner.h
 playtrack.o: playtrack.c audio.h
+tuner.o: tuner.c tuner.h
+hardware.o: hardware.c hardware.h
+statics.o: statics.c statics.h
