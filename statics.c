@@ -12,14 +12,14 @@ typedef struct {
 
 STATICSTATE static_init(int color) {
 	staticstate_private *state = (staticstate_private *)malloc(sizeof(staticstate_private));
-	int len = 30000;
+	int len = 300000 + (rand()&65535);
 	int i, v = 0, c = 0;
 	state->offset = rand() % len;
 	state->length = len;
 	state->buf = malloc(2 * len);
 
 	for(i=0; i<len; i++) {
-		if (c==0) v = (rand()%16000)-8000;
+		if (c==0) v = (rand()&32767)-16384;
 		c ++;
 		if (c > color / 10) c = 0;
 		state->buf[i] = v;
@@ -79,6 +79,8 @@ void static_generate(STATICSTATE statics, const sp_audioformat *format, audio_fi
 		x = infd->samples[i];
 		// x += (rand() % 10000) * state->targetvol / 32768;
 		x += (state->buf[o] * state->vol) / 32768;
+		if (x<-32767) x=-32767;
+		if (x>32767) x=32767;
 		afd->samples[i] = x;
 		o ++;
 		if (o > state->length) o=0;
