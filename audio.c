@@ -27,6 +27,15 @@
 
 #include "audio.h"
 #include <stdlib.h>
+#include <pthread.h>
+
+void audio_fifo_reset(audio_fifo_t *af)
+{
+    TAILQ_INIT(&af->q);
+    af->qlen = 0;
+    pthread_mutex_init(&af->mutex, NULL);
+    pthread_cond_init(&af->cond, NULL);
+}
 
 audio_fifo_data_t* audio_get(audio_fifo_t *af)
 {
