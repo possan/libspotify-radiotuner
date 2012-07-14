@@ -387,7 +387,7 @@ static int music_delivery(sp_session *sess, const sp_audioformat *format,
 	pthread_mutex_lock(&af->mutex);
 
 	/* Buffer one second of audio */
-	if (af->qlen > format->sample_rate) {
+	if (af->qlen > format->sample_rate/10) {
 		pthread_mutex_unlock(&af->mutex);
 
 		return 0;
@@ -397,6 +397,7 @@ static int music_delivery(sp_session *sess, const sp_audioformat *format,
 
 	afd = malloc(sizeof(*afd) + s);
 	memcpy(afd->samples, frames, s);
+	// fix volume
 
 	afd->nsamples = num_frames;
 
@@ -535,20 +536,39 @@ void peek_input() {
 		case 'X': hardware_fire_event(HE_X_UP); break;
 		case ' ': hardware_fire_event(HE_PLAY_PAUSE); break;
 		case 'n': hardware_fire_event(HE_SKIP_NEXT); break;
-		case '1': static_setvolume(g_static1, static_getvolume(g_static1) + 0.1); break;
-		case 'q': static_setvolume(g_static1, static_getvolume(g_static1) - 0.1); break;
-		case '2': static_setvolume(g_static2, static_getvolume(g_static2) + 0.1); break;
-		case 'w': static_setvolume(g_static2, static_getvolume(g_static2) - 0.1); break;
-		case '3': static_setvolume(g_static3, static_getvolume(g_static3) + 0.1); break;
-		case 'e': static_setvolume(g_static3, static_getvolume(g_static3) - 0.1); break;
+		case '1': hardware_fire_event(HE_CHANNEL1); break;
+		case '2': hardware_fire_event(HE_CHANNEL2); break;
+		case '3': hardware_fire_event(HE_CHANNEL3); break;
+		case '4': hardware_fire_event(HE_CHANNEL4); break;
+		case '5': hardware_fire_event(HE_CHANNEL5); break;
 		default: printf("unhandled character '%c' #%d\n", c, c); break;
 	}
 }
 
+
+void tuner_debug() {
+	struct tunerstate ts;
+	tuner_getstate( g_tuner, &ts );
+	printf("TUNER; freq=%d, channel=%d, playlist=\"%s\", volumes=[%d,  %d,%d,%d]\n",
+		ts.freq, ts.music_playlist_index, ts.music_playlist_uri,
+		(int)(ts.music_volume*100),
+		(int)(ts.static_volume*100),
+		(int)(ts.static2_volume*100),
+		(int)(ts.static3_volume*100) );
+	char buf[10];
+	sprintf(buf,"f=%d", ts.freq);
+	hardware_banner(buf, 200);
+}
+
 void _hardware_event(int event) {
 	switch(event) {
-		case HE_FREQ_UP: tuner_tune_by(g_tuner, 1); break;
-		case HE_FREQ_DOWN: tuner_tune_by(g_tuner, -1); break;
+		case HE_FREQ_UP: tuner_tune_by(g_tuner, 1); tuner_debug(); break;
+		case HE_FREQ_DOWN: tuner_tune_by(g_tuner, -1); tuner_debug(); break;
+		case HE_CHANNEL1: tuner_goto(g_tuner, 0); tuner_debug(); break;
+		case HE_CHANNEL2: tuner_goto(g_tuner, 1); tuner_debug(); break;
+		case HE_CHANNEL3: tuner_goto(g_tuner, 2); tuner_debug(); break;
+		case HE_CHANNEL4: tuner_goto(g_tuner, 3); tuner_debug(); break;
+		case HE_CHANNEL5: tuner_goto(g_tuner, 4); tuner_debug(); break;
 		case HE_PLAY_PAUSE: break;
 		case HE_SKIP_PREV: break;
 		case HE_SKIP_NEXT: break;
@@ -577,7 +597,14 @@ void staticloop(void *arg) {
 	f.channels = 2;
 	f.sample_rate = 44100;
 
+	struct tunerstate tunerstate;
+
 	while(1) {
+
+		tuner_getstate( g_tuner, &tunerstate );
+		static_setvolume( g_static1, tunerstate.static_volume );
+		static_setvolume( g_static2, tunerstate.static2_volume );
+		static_setvolume( g_static3, tunerstate.static3_volume );
 
 		static_generate( g_static1, &f, &g_musicfifo, &g_staticfifo1 );
 		static_generate( g_static2, &f, &g_staticfifo1, &g_staticfifo2 );
@@ -629,18 +656,18 @@ int main(int argc, char **argv)
 	hardware_banner("welcome.", 200);
 	hardware_set_callback(_hardware_event);
 
-	g_static1 = static_init(30);
-	g_static2 = static_init(100);
-	g_static3 = static_init(250);
+	g_static1 = static_init(1);
+	g_static2 = static_init(13);
+	g_static3 = static_init(29);
 
 	static_setvolume(g_static1, 0.5);
 
 	g_tuner = tuner_init();
-	tuner_addchannel(g_tuner, 10, "Channel 1", "uri1");
-	tuner_addchannel(g_tuner, 33, "Channel 2", "uri2");
-	tuner_addchannel(g_tuner, 50, "Channel 3", "uri3");
-	tuner_addchannel(g_tuner, 70, "Channel 4", "uri4");
-	tuner_addchannel(g_tuner, 80, "Channel 5", "uri5");
+	tuner_addchannel(g_tuner, 20, "Channel 1", "uri1");
+	tuner_addchannel(g_tuner, 50, "Channel 2", "uri2");
+	tuner_addchannel(g_tuner, 80, "Channel 3", "uri3");
+//	tuner_addchannel(g_tuner,70, "Channel 4", "uri4");
+//	tuner_addchannel(g_tuner, 80, "Channel 5", "uri5");
 
 	audio_fifo_reset(&g_musicfifo);
 	audio_fifo_reset(&g_staticfifo1);

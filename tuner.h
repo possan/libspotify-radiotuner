@@ -2,12 +2,10 @@
 #define _TUNER_H_
 
 struct tunerstate {
+	int freq;
 	float static_volume;
-	int static_sample;
-
 	float static2_volume;
-	int static2_sample;
-
+	float static3_volume;
 	float music_volume;
 	int music_playlist_index;
 	char music_playlist_uri[100];
@@ -21,5 +19,6 @@ extern void tuner_free(TUNER tuner);
 extern void tuner_addchannel(TUNER tuner, int freq, char *name, char *uri);
 extern void tuner_tune_by(TUNER tuner, int delta);
 extern void tuner_tune_to(TUNER tuner, int freq);
+extern void tuner_goto(TUNER tuner, int channel);
 
 #endif

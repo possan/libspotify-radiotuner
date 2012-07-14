@@ -10,6 +10,11 @@
 #define HE_SKIP_PREV 16
 #define HE_SKIP_NEXT 17
 #define HE_PLAY_PAUSE 20
+#define HE_CHANNEL1 30
+#define HE_CHANNEL2 31
+#define HE_CHANNEL3 32
+#define HE_CHANNEL4 33
+#define HE_CHANNEL5 34
 
 typedef void *HARDWARE_EVENT_CALLBACK(int event);
 
