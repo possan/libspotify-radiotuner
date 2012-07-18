@@ -18,11 +18,10 @@
 
 typedef void *HARDWARE_EVENT_CALLBACK(int event);
 
-extern void hardware_start();
+extern void hardware_start(char *portname);
 extern void hardware_stop();
 extern void hardware_banner(char *message, int ttl_ms);
 extern void hardware_setleds();
-extern void hardware_tick();
 extern void hardware_set_callback(HARDWARE_EVENT_CALLBACK *callback);
 extern void hardware_fire_event(int event);
 

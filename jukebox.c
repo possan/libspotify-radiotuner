@@ -775,9 +775,10 @@ int main(int argc, char **argv)
 	int next_timeout = 0;
 	const char *username = NULL;
 	const char *password = NULL;
+	const char *serialdevice = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "u:p:")) != EOF) {
+	while ((opt = getopt(argc, argv, "u:p:s:")) != EOF) {
 		switch (opt) {
 		case 'u':
 			username = optarg;
@@ -785,6 +786,10 @@ int main(int argc, char **argv)
 
 		case 'p':
 			password = optarg;
+			break;
+
+		case 's':
+			serialdevice = optarg;
 			break;
 
 		default:
@@ -811,7 +816,8 @@ int main(int argc, char **argv)
 	printf("static2 fifo: %X\n", &g_staticfifo2);
 	printf("audio fifo: %X\n", &g_audiofifo);
 
-	hardware_start();
+	hardware_start(serialdevice);
+
 	hardware_banner("welcome.", 200);
 	hardware_set_callback(_hardware_event);
 
