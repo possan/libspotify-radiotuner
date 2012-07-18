@@ -76,6 +76,8 @@ static STATICSTATE g_static3;
 static int g_track_index;
 
 static TUNER g_tuner;
+static char g_last_track_name[500];
+static char g_last_playlist_name[500];
 
 static int g_is_playing = 0;
 
@@ -143,9 +145,18 @@ static void try_jukebox_start(void)
 	g_currenttrack = t;
 
 	printf("jukebox: Now playing \"%s\"...\n", sp_track_name(t));
-	fflush(stdout);
 
-	hardware_banner(sp_track_name(t), 200);
+	sp_artist *art = sp_track_artist(t, 0);
+	if (art != NULL) {
+		printf("jukebox: By \"%s\"...\n", sp_artist_name(art));
+		sprintf( g_last_track_name, "%s by %s", sp_track_name(t), sp_artist_name(art) );
+	} else {
+		sprintf( g_last_track_name, "%s", sp_track_name(t) );
+	}
+
+
+
+	fflush(stdout);
 
 	sp_session_player_load(g_sess, t);
 	usleep(100000);
@@ -156,6 +167,7 @@ static void try_jukebox_start(void)
 	notify_main_thread(g_sess);
 
 	printf("after try_jukebox_start\n");
+	tuner_debug();
 }
 
 /* --------------------------  PLAYLIST CALLBACKS  ------------------------- */
@@ -367,7 +379,8 @@ void start_playlist(char *uri)
 	sp_link *link = sp_link_create_from_string(uri);
 	sp_playlist *pl = sp_playlist_create(g_sess, link);
 	sp_playlist_add_callbacks(pl, &pl_callbacks, NULL);
-	hardware_banner(sp_playlist_name(pl), 200);
+	sprintf(g_last_playlist_name, sp_playlist_name(pl));
+	// hardware_banner(sp_playlist_name(pl), 200);
 	g_jukeboxlist = pl;
 	try_jukebox_start();
 }
@@ -533,6 +546,7 @@ static void track_ended(bool startNext) {
 		try_jukebox_start();
 		usleep(50000);
 		notify_main_thread(g_sess);
+				banner_track();
 	}
 }
 
@@ -566,18 +580,47 @@ void peek_input() {
 	}
 }
 
+int last_display_playlist = -1;
+int last_display_freq = -1;
+
+void banner_track() {
+	if (strlen(g_last_track_name) > 0) {
+		hardware_banner(g_last_track_name, 200);
+	}
+}
+
 void tuner_debug() {
 	struct tunerstate ts;
 	tuner_getstate( g_tuner, &ts );
-	printf("TUNER; freq=%d, channel=%d, playlist=\"%s\", volumes=[%d,  %d,%d,%d]\n",
-		ts.freq, ts.music_playlist_index, ts.music_playlist_uri,
+	printf("TUNER; freq=%d, channel=%d (%d), playlist=\"%s\", volumes=[%d,  %d,%d,%d]\n",
+		ts.freq,
+		ts.music_playlist_index,
+		ts.display_playlist_index,
+		ts.music_playlist_uri,
 		(int)(ts.music_volume * 100),
 		(int)(ts.static_volume * 100),
 		(int)(ts.static2_volume * 100),
 		(int)(ts.static3_volume * 100));
-	char buf[10];
-	sprintf(buf,"%d%%", ts.freq);
-	hardware_banner(buf, 200);
+
+	if (ts.display_freq != last_display_freq) {
+		last_display_freq = ts.display_freq;
+		char buf[10];
+		sprintf(buf,"%d%%", ts.display_freq);
+		hardware_banner(buf, 200);
+	}
+
+	if (ts.display_playlist_index != last_display_playlist) {
+		last_display_playlist = ts.display_playlist_index;
+		if (last_display_playlist != -1) {
+
+			if (strlen(g_last_playlist_name) > 0) {
+				hardware_banner(g_last_playlist_name, 200);
+			}
+
+			banner_track();
+		}
+	}
+
 }
 
 void _hardware_event(int event) {
@@ -602,6 +645,7 @@ void _hardware_event(int event) {
 			notify_main_thread(g_sess);
 			break;
 		case HE_SKIP_NEXT:
+			hardware_banner("Skip", 100);
 			track_ended(1);
 			notify_main_thread(g_sess);
 			break;
@@ -692,7 +736,7 @@ void static1loop(void *arg) {
 		struct tunerstate tunerstate;
 		tuner_getstate(g_tuner, &tunerstate);
 		static_setvolume(g_static1, tunerstate.static_volume);
-		static_generate(g_static1, &g_gaplessfifo, &g_staticfifo1);
+		static_generate(g_static1, &g_gaplessfifo, &g_staticfifo1, 1);
 	}
 }
 
@@ -705,8 +749,8 @@ void static2loop(void *arg) {
 		if (a2 > 5000) continue;
 		struct tunerstate tunerstate;
 		tuner_getstate(g_tuner, &tunerstate);
-		static_setvolume(g_static1, tunerstate.static2_volume);
-		static_generate(g_static1, &g_staticfifo1, &g_staticfifo2);
+		static_setvolume(g_static2, tunerstate.static2_volume);
+		static_generate(g_static2, &g_staticfifo1, &g_staticfifo2, 0);
 	}
 }
 
@@ -719,8 +763,8 @@ void static3loop(void *arg) {
 		if (a2 > 5000) continue;
 		struct tunerstate tunerstate;
 		tuner_getstate(g_tuner, &tunerstate);
-		static_setvolume(g_static1, tunerstate.static3_volume);
-		static_generate(g_static1, &g_staticfifo2, &g_audiofifo);
+		static_setvolume(g_static3, tunerstate.static3_volume);
+		static_generate(g_static3, &g_staticfifo2, &g_audiofifo, 0);
 	}
 }
 
@@ -771,15 +815,16 @@ int main(int argc, char **argv)
 	hardware_banner("welcome.", 200);
 	hardware_set_callback(_hardware_event);
 
-	g_static1 = static_init(1);
-	g_static2 = static_init(20);
-	g_static3 = static_init(69);
+	g_static1 = static_init(BROWN_NOISE);
+	g_static2 = static_init(PINK_NOISE);
+	g_static3 = static_init(WHITE_NOISE);
 
 	g_tuner = tuner_init();
-	tuner_addchannel(g_tuner, 18, "Channel 1", "spotify:user:possan:playlist:4g17smZvFZqg4dN74XMBYH");
-	tuner_addchannel(g_tuner, 46, "Channel 2", "spotify:user:possan:playlist:2BBVnBjG4Cynww1mnjfV0v");
-	tuner_addchannel(g_tuner, 75, "Channel 3", "spotify:user:possan:playlist:72weZVptgKfYFyzafxBdO5");
+	tuner_addchannel(g_tuner, 130 + rand()%100, "Channel 1", "spotify:user:possan:playlist:4g17smZvFZqg4dN74XMBYH");
+	tuner_addchannel(g_tuner, 410 + rand()%100, "Channel 2", "spotify:user:possan:playlist:2BBVnBjG4Cynww1mnjfV0v");
+	tuner_addchannel(g_tuner, 700 + rand()%100, "Channel 3", "spotify:user:possan:playlist:72weZVptgKfYFyzafxBdO5");
 	tuner_goto(g_tuner, rand() % tuner_numchannels(g_tuner));
+	tuner_tune_by(g_tuner, -7 + rand()%15);
 
 	printf("Start loop...\n");
 

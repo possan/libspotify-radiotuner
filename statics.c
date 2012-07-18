@@ -43,7 +43,7 @@ float static_getvolume(STATICSTATE statics) {
 	return state->targetvol_f;
 }
 
-void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t *outputfifo) {
+void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t *outputfifo, bool comped) {
 	staticstate_private *state = (staticstate_private *)statics;
 
 	audio_fifo_t *af = outputfifo;
@@ -59,7 +59,13 @@ void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t 
 	o = state->offset;
 	for(i=0; i<afd->nsamples * afd->channels; i++) {
 		x = infd->samples[i];
-		x += (state->buf[o] * state->vol) / 32768;
+		if (comped) {
+			x -= (x * state->vol) / 100000;
+			x += (state->buf[o] * state->vol) / 60000;
+		}
+		else {
+			x += (state->buf[o] * state->vol) / 32768;
+		}
 		if (x<-32767) x=-32767;
 		if (x>32767) x=32767;
 		afd->samples[i] = x;

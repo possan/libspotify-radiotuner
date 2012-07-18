@@ -8,6 +8,8 @@ struct tunerstate {
 	float static3_volume;
 	float music_volume;
 	int music_playlist_index;
+	int display_playlist_index;
+	int display_freq;
 	char music_playlist_uri[100];
 };
 

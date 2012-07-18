@@ -27,7 +27,7 @@ void hardware_set_callback(HARDWARE_EVENT_CALLBACK *callback) {
 }
 
 void hardware_fire_event(int event) {
-	printf("HARDWARE: Got event #%d\n", event);
+	// printf("HARDWARE: Got event #%d\n", event);
 	if (g_event_callback != NULL) g_event_callback(event);
 }
 
