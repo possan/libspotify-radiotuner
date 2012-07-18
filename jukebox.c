@@ -57,10 +57,10 @@ extern const size_t g_appkey_size;
 
 static audio_fifo_t g_musicfifo;
 static audio_fifo_t g_gaplessfifo;
-// static audio_fifo_t g_staticfifo1;
-// static audio_fifo_t g_staticfifo2;
+static audio_fifo_t g_staticfifo1;
+static audio_fifo_t g_staticfifo2;
 // static audio_fifo_t g_staticfifo3;
-// static audio_fifo_t g_audiofifo;
+static audio_fifo_t g_audiofifo;
 
 static pthread_mutex_t g_notify_mutex;
 static pthread_cond_t g_notify_cond;
@@ -681,14 +681,14 @@ void gaplessloop(void *arg) {
 	}
 }
 
-/*
 void static1loop(void *arg) {
 	sleep(2);
 	while(1) {
 		usleep(1000);
 		int a = audio_fifo_available(&g_gaplessfifo);
 		if (a < 2000) continue;
-		// if (a > 10000) continue;
+		int a2 = audio_fifo_available(&g_staticfifo1);
+		if (a2 > 5000) continue;
 		struct tunerstate tunerstate;
 		tuner_getstate(g_tuner, &tunerstate);
 		static_setvolume(g_static1, tunerstate.static_volume);
@@ -701,7 +701,8 @@ void static2loop(void *arg) {
 		usleep(1000);
 		int a = audio_fifo_available(&g_staticfifo1);
 		if (a < 2000)	continue;
-		// if (a > 10000) continue;
+		int a2 = audio_fifo_available(&g_staticfifo2);
+		if (a2 > 5000) continue;
 		struct tunerstate tunerstate;
 		tuner_getstate(g_tuner, &tunerstate);
 		static_setvolume(g_static1, tunerstate.static2_volume);
@@ -714,14 +715,14 @@ void static3loop(void *arg) {
 		usleep(1000);
 		int a = audio_fifo_available(&g_staticfifo2);
 		if (a < 2000)	continue;
-		// if (a > 10000) continue;
+		int a2 = audio_fifo_available(&g_audiofifo);
+		if (a2 > 5000) continue;
 		struct tunerstate tunerstate;
 		tuner_getstate(g_tuner, &tunerstate);
 		static_setvolume(g_static1, tunerstate.static3_volume);
 		static_generate(g_static1, &g_staticfifo2, &g_audiofifo);
 	}
 }
-*/
 
 int main(int argc, char **argv)
 {
@@ -756,14 +757,15 @@ int main(int argc, char **argv)
 
 	audio_fifo_reset(&g_musicfifo);
 	audio_fifo_reset(&g_gaplessfifo);
-	// audio_fifo_reset(&g_staticfifo1);
-	// audio_fifo_reset(&g_staticfifo2);
+	audio_fifo_reset(&g_staticfifo1);
+	audio_fifo_reset(&g_staticfifo2);
 	// audio_fifo_reset(&g_staticfifo3);
 
 	printf("music fifo: %X\n", &g_musicfifo);
 	printf("gapless fifo: %X\n", &g_gaplessfifo);
-	// printf("static1 fifo: %X\n", &g_staticfifo1);
-	// printf("audio fifo: %X\n", &g_audiofifo);
+	printf("static1 fifo: %X\n", &g_staticfifo1);
+	printf("static2 fifo: %X\n", &g_staticfifo2);
+	printf("audio fifo: %X\n", &g_audiofifo);
 
 	hardware_start();
 	hardware_banner("welcome.", 200);
@@ -783,8 +785,8 @@ int main(int argc, char **argv)
 
 	spconfig.application_key_size = g_appkey_size;
 
-	//audio_init(&g_audiofifo);
-	audio_init(&g_gaplessfifo);
+	audio_init(&g_audiofifo);
+	// audio_init(&g_gaplessfifo);
 
 	err = sp_session_create(&spconfig, &sp);
 
@@ -807,7 +809,6 @@ int main(int argc, char **argv)
 	static pthread_t id2;
 	pthread_create(&id2, NULL, gaplessloop, NULL);
 
-	/*
 	static pthread_t id3;
 	pthread_create(&id3, NULL, static1loop, NULL);
 
@@ -816,7 +817,6 @@ int main(int argc, char **argv)
 
 	static pthread_t id5;
 	pthread_create(&id5, NULL, static3loop, NULL);
-	*/
 
 	for (;;) {
 		if (next_timeout == 0) {
