@@ -45,7 +45,7 @@ typedef struct audio_fifo {
 	TAILQ_HEAD(, audio_fifo_data) q;
 	int qlen;
 	pthread_mutex_t mutex;
-	pthread_cond_t cond;
+	// pthread_cond_t cond;
 } audio_fifo_t;
 
 
@@ -53,6 +53,10 @@ typedef struct audio_fifo {
 extern void audio_fifo_reset(audio_fifo_t *af);
 extern void audio_init(audio_fifo_t *af);
 extern void audio_fifo_flush(audio_fifo_t *af);
-audio_fifo_data_t* audio_get(audio_fifo_t *af);
+extern audio_fifo_data_t* audio_get(audio_fifo_t *af);
+
+extern audio_fifo_data_t *audio_data_create(int samples, int channels);
+extern int audio_fifo_available(audio_fifo_t *af);
+extern void audio_fifo_queue(audio_fifo_t *af, audio_fifo_data_t *data);
 
 #endif /* _JUKEBOX_AUDIO_H_ */

@@ -2,6 +2,7 @@
 #include <string.h>
 #include "tuner.h"
 #include "statics.h"
+#include <math.h>
 
 typedef struct {
 	int freq;
@@ -18,13 +19,17 @@ typedef struct {
 	tuner_channel channels[10];
 } tuner_private;
 
+float  scale_noise(float f ){
+	f += 0.5f;
+	if (f < 0.0f) f=0.0f;
+	if (f > 1.0f) f=1.0f;
+	return f;
+}
 void tuner_getstate(TUNER tunerid, struct tunerstate *output) {
 
 	tuner_private *tuner = (tuner_private *)tunerid;
 
-	int i;
-	int closest_channel = -1;
-	int closest_dist = 999999;
+	int i, closest_channel = -1, closest_dist = 999999;
 	for (i=0; i<tuner->num_channels; i++) {
 		tuner_channel *channel = &tuner->channels[i];
 		int d = abs(channel->freq - tuner->freq);
@@ -36,9 +41,9 @@ void tuner_getstate(TUNER tunerid, struct tunerstate *output) {
 
 	output->freq = tuner->freq;
 	output->music_volume = .0f;
-	output->static_volume = 0.5f + 0.5f*pnoise((float)tuner->freq * 2.56f, 0, tuner->perlin_random1);
-	output->static2_volume = 0.5f + 0.5f*pnoise((float)tuner->freq * 2.56f, 64, tuner->perlin_random2);
-	output->static3_volume = 0.5f + 0.5f*pnoise((float)tuner->freq * 2.56f, 128, tuner->perlin_random3);
+	output->static_volume = scale_noise(pnoise((float)tuner->freq * 2.56f, tuner->perlin_random1, 70.0f));
+	output->static2_volume = scale_noise(pnoise((float)tuner->freq * 2.56f, tuner->perlin_random2, 50.0f));
+	output->static3_volume = scale_noise(pnoise((float)tuner->freq * 2.56f, tuner->perlin_random3, 0.0f));
 	output->music_playlist_index = -1;
 	strcpy(output->music_playlist_uri, "");
 
@@ -54,7 +59,8 @@ void tuner_getstate(TUNER tunerid, struct tunerstate *output) {
 
 	if (mv < 0.0f) mv = .0f;
 
-	output->music_volume = mv;
+	output->music_volume = mv * 1.2f;
+	if (output->music_volume > 1.0f) output->music_volume = 1.0f;
 	output->static_volume *= 1.0f-mv;
 	output->static2_volume *= 1.0f-mv;
 	output->static3_volume *= 1.0f-mv;
@@ -86,6 +92,11 @@ void tuner_addchannel(TUNER tunerid, int freq, char *name, char *uri) {
 	strcpy( chan->uri, uri );
 }
 
+int tuner_numchannels(TUNER tunerid) {
+	tuner_private *tuner = (tuner_private *)tunerid;
+	return tuner->num_channels;
+}
+
 void tuner_tune_by(TUNER tunerid, int delta) {
 	tuner_private *tuner = (tuner_private *)tunerid;
 	tuner->freq += delta;
@@ -104,6 +115,7 @@ void tuner_tune_to(TUNER tunerid, int freq) {
 
 void tuner_goto(TUNER tunerid, int channel) {
 	tuner_private *tuner = (tuner_private *)tunerid;
+	printf("TUNER: Tune to channel #%d\n", channel);
 	if (channel < 0) return;
 	if (channel >= tuner->num_channels) return;
 	tuner->freq = tuner->channels[channel].freq;

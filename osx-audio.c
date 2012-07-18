@@ -75,9 +75,11 @@ void audio_init(audio_fifo_t *af)
 
     state.buffer_size = state.desc.mBytesPerFrame * kSampleCountPerBuffer;
 
+    printf("OSX audio initialized.\n");
+
     if (noErr != AudioQueueNewOutput(&state.desc, audio_callback, af, NULL, NULL, 0, &state.queue)) {
-	printf("audioqueue error\n");
-	return;
+    	printf("audioqueue error\n");
+    	return;
     }
 
     // Start some empty playback so we'll get the callbacks that fill in the actual audio.

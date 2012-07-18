@@ -29,41 +29,63 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-void audio_fifo_reset(audio_fifo_t *af)
-{
+void audio_fifo_reset(audio_fifo_t *af) {
     TAILQ_INIT(&af->q);
     af->qlen = 0;
     pthread_mutex_init(&af->mutex, NULL);
-    pthread_cond_init(&af->cond, NULL);
+    // pthread_cond_init(&af->cond, NULL);
 }
 
-audio_fifo_data_t* audio_get(audio_fifo_t *af)
-{
-    audio_fifo_data_t *afd;
+audio_fifo_data_t* audio_get(audio_fifo_t *af) {
+    audio_fifo_data_t *afd = NULL;
     pthread_mutex_lock(&af->mutex);
-  
-    while (!(afd = TAILQ_FIRST(&af->q)))
-	pthread_cond_wait(&af->cond, &af->mutex);
-  
-    TAILQ_REMOVE(&af->q, afd, link);
-    af->qlen -= afd->nsamples;
-  
+    afd = TAILQ_FIRST(&af->q);
+    if (afd != NULL) {
+        // while (!(afd = TAILQ_FIRST(&af->q))) {};
+        // pthread_cond_wait(&af->cond, &af->mutex);
+        TAILQ_REMOVE(&af->q, afd, link);
+        af->qlen -= afd->nsamples;
+    }
     pthread_mutex_unlock(&af->mutex);
     return afd;
 }
 
-void audio_fifo_flush(audio_fifo_t *af)
-{
+void audio_fifo_flush(audio_fifo_t *af) {
+    printf("flush fifo %X\n", af);
     audio_fifo_data_t *afd;
-
-
     pthread_mutex_lock(&af->mutex);
-
-    while((afd = TAILQ_FIRST(&af->q))) {
-	TAILQ_REMOVE(&af->q, afd, link);
-	free(afd);
+    while ((afd = TAILQ_FIRST(&af->q))) {
+    	TAILQ_REMOVE(&af->q, afd, link);
+    	free(afd);
     }
-
     af->qlen = 0;
     pthread_mutex_unlock(&af->mutex);
+    af->qlen = 0;
 }
+
+int audio_fifo_available(audio_fifo_t *af) {
+    pthread_mutex_lock(&af->mutex);
+    int r = af->qlen;
+    pthread_mutex_unlock(&af->mutex);
+    return r;
+}
+
+audio_fifo_data_t *audio_data_create(int samples, int channels) {
+    int s = samples * sizeof(int16_t) * channels;
+    audio_fifo_data_t *afd = malloc(sizeof(audio_fifo_data_t) + s);
+    afd->nsamples = samples;
+    afd->channels = channels;
+    afd->rate = 44100;
+    memset(afd->samples, 0, s);
+    return afd;
+}
+
+void audio_fifo_queue(audio_fifo_t *af, audio_fifo_data_t *afd) {
+    pthread_mutex_lock(&af->mutex);
+    // printf("audio_fifo_queue( af=%X, afd=%X )\n", af, afd);
+    TAILQ_INSERT_TAIL(&af->q, afd, link);
+    af->qlen += afd->nsamples;// * afd->channels;
+    // pthread_cond_signal(&af->cond);
+    pthread_mutex_unlock(&af->mutex);
+}
+

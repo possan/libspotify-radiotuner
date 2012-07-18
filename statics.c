@@ -19,9 +19,9 @@ STATICSTATE static_init(int color) {
 	state->offset = rand() % len;
 	state->length = len;
 	state->buf = malloc(2 * len);
-
 	for(i=0; i<len; i++) {
-		if (c==0) v = (rand()&32767)-16384;
+		if (c==0)
+			v = (rand() & 8191) - 4096;
 		c ++;
 		if (c > color / 10) c = 0;
 		state->buf[i] = v;
@@ -36,7 +36,6 @@ void static_setvolume(STATICSTATE statics, float volume) {
 	if (volume > 1.0) volume = 1.0;
 	state->targetvol_f = volume;
 	state->targetvol = (int)(32768.0f * volume);
-	// printf("STATIC: Set volume to %d\n", state->targetvol);
 }
 
 float static_getvolume(STATICSTATE statics) {
@@ -44,42 +43,22 @@ float static_getvolume(STATICSTATE statics) {
 	return state->targetvol_f;
 }
 
-void static_generate(STATICSTATE statics, const sp_audioformat *format, audio_fifo_t *inputfifo, audio_fifo_t *outputfifo) {
+void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t *outputfifo) {
 	staticstate_private *state = (staticstate_private *)statics;
 
-	int num_frames = 0;
-
 	audio_fifo_t *af = outputfifo;
-	audio_fifo_data_t *afd;
-	int i,o,x;
-	size_t s;
-
-	pthread_mutex_lock(&af->mutex);
-
-	/* Buffer one second of audio */
-	if (af->qlen > format->sample_rate) {
-		pthread_mutex_unlock(&af->mutex);
-		return 0;
-	}
-
-
+	int i, o, x;
 
 	audio_fifo_data_t *infd = audio_get(inputfifo);
-	if (infd)
-	// printf("%d samples x %d channels\n", infd->nsamples, infd->channels);
-	num_frames = infd->nsamples;
+	if (infd == NULL)
+		return;
 
-
-
-	s = num_frames * sizeof(int16_t) * format->channels;
-
-	afd = malloc(sizeof(*afd) + s);
-//	memcpy(afd->samples, frames, s);
+	// printf("Generating noise; samples=%d, channels=%d\n", infd->nsamples, infd->channels);
+	audio_fifo_data_t *afd = audio_data_create(infd->nsamples, infd->channels);
 
 	o = state->offset;
-	for(i=0; i<num_frames * format->channels; i++) {
+	for(i=0; i<afd->nsamples * afd->channels; i++) {
 		x = infd->samples[i];
-		// x += (rand() % 10000) * state->targetvol / 32768;
 		x += (state->buf[o] * state->vol) / 32768;
 		if (x<-32767) x=-32767;
 		if (x>32767) x=32767;
@@ -93,22 +72,13 @@ void static_generate(STATICSTATE statics, const sp_audioformat *format, audio_fi
 
 	free(infd);
 
-	afd->nsamples = num_frames;
-
-	afd->rate = format->sample_rate;
-	afd->channels = format->channels;
-
-	TAILQ_INSERT_TAIL(&af->q, afd, link);
-	af->qlen += num_frames;
-
-	pthread_cond_signal(&af->cond);
-	pthread_mutex_unlock(&af->mutex);
-
+	audio_fifo_queue(outputfifo, afd);
 }
 
 void static_free(STATICSTATE statics) {
 	staticstate_private *state = (staticstate_private *)statics;
 	free(state->buf);
+	free(state);
 }
 
 

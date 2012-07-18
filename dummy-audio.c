@@ -51,6 +51,8 @@ void audio_init(audio_fifo_t *af)
 	TAILQ_INIT(&af->q);
 	af->qlen = 0;
 
+  printf("Dummy audio initialized.\n");
+
 	pthread_mutex_init(&af->mutex, NULL);
 	pthread_cond_init(&af->cond, NULL);
 
