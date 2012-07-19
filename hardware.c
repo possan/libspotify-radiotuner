@@ -26,8 +26,8 @@ void openport(char *name) {
  		return;
  	}
 	tcgetattr(fd,&options);
-	cfsetispeed(&options,B9600);
-	cfsetospeed(&options,B9600);
+	cfsetispeed(&options,B115200);
+	cfsetospeed(&options,B115200);
 	options.c_cflag |= (CLOCAL | CREAD);
 	options.c_cflag &= ~PARENB;
 	options.c_cflag &= ~CSTOPB;
@@ -46,7 +46,7 @@ static void hardware_tick(void *arg) {
 			continue;
 		int res = read(fd, &buf, 1);
 		if(res) {
-			printf("HARDWARE: got '%c'\n", buf[0]);
+			// printf("HARDWARE: got '%c'\n", buf[0]);
 		}
 	}
 }
@@ -71,7 +71,7 @@ void hardware_stop() {
 void hardware_banner(char *message, int ttl_ms) {
 	printf("HARDWARE: Show banner \"%s\" for %d ms.\n", message, ttl_ms);
 	if (fd!=-1) {
-		write(fd, "MSG:", 1);			// chr(10) start comms
+//		write(fd, "MSG:", 1);			// chr(10) start comms
 		write(fd, message, strlen(message));			// 0 = off 1 = on 2 = ask LED state
 		write(fd, "\n", 1);
 	}
