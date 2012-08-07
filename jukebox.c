@@ -1,32 +1,3 @@
-/**
- * Copyright (c) 2006-2010 Spotify Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- *
- * This example application shows parts of the playlist and player submodules.
- * It also shows another way of doing synchronization between callbacks and
- * the main thread.
- *
- * This file is part of the libspotify examples suite.
- */
-
 #include <errno.h>
 #include <libgen.h>
 #include <pthread.h>
@@ -42,6 +13,7 @@
 #include "hardware.h"
 #include "tuner.h"
 #include "statics.h"
+#include <mcheck.h>
 
 extern const uint8_t g_appkey[];
 extern const size_t g_appkey_size;
@@ -59,23 +31,22 @@ static audio_fifo_t g_musicfifo;
 static audio_fifo_t g_gaplessfifo;
 static audio_fifo_t g_staticfifo1;
 static audio_fifo_t g_staticfifo2;
-// static audio_fifo_t g_staticfifo3;
 static audio_fifo_t g_audiofifo;
 
 static pthread_mutex_t g_notify_mutex;
 static pthread_cond_t g_notify_cond;
-static int g_notify_do;
-static int g_playback_done;
-static sp_session *g_sess;
-static sp_playlist *g_jukeboxlist;
-static sp_track *g_currenttrack;
+static int g_notify_do = 0;
+static int g_playback_done = 0;
+static sp_session *g_sess = NULL;
+static sp_playlist *g_jukeboxlist = NULL;
+static sp_track *g_currenttrack = NULL;
 
-static STATICSTATE g_static1;
-static STATICSTATE g_static2;
-static STATICSTATE g_static3;
-static int g_track_index;
+static STATICSTATE g_static1 = 0;
+static STATICSTATE g_static2 = 0;
+static STATICSTATE g_static3 = 0;
+static int g_track_index = -1;
 
-static TUNER g_tuner;
+static TUNER g_tuner = 0;
 static char g_last_track_name[500];
 static char g_last_playlist_name[500];
 
@@ -124,7 +95,7 @@ static void try_jukebox_start(void)
 	printf("play track %d of %d\n", g_track_index, nt);
 
 	t = sp_playlist_track(g_jukeboxlist, g_track_index);
-
+	printf("t=%X\n", t);
 	if (g_currenttrack && t != g_currenttrack) {
 		printf("stopping currently playing..\n");
 		/* Someone changed the current track */
@@ -136,11 +107,16 @@ static void try_jukebox_start(void)
 	if (!t)
 		return;
 
-	if (sp_track_error(t) != SP_ERROR_OK)
+	int err = sp_track_error(t);
+	if (err != SP_ERROR_OK /*&& err != SP_ERROR_IS_LOADING*/) {
+		printf("track error? %d\n", err);
 		return;
+	}
 
-	if (g_currenttrack == t)
+	if (g_currenttrack == t) {
+		printf("not starting the same track.\n");
 		return;
+	}
 
 	g_currenttrack = t;
 
@@ -401,6 +377,8 @@ static int music_delivery(sp_session *sess, const sp_audioformat *format,
 	int i, f;
 	signed short *ptr1, *ptr2;
 
+	// printf("music_delivery; %d samples at %X.", num_frames, frames);
+
 	if (num_frames == 0) {
 		// Audio discontinuity, do nothing
 		usleep(1000);
@@ -415,8 +393,6 @@ static int music_delivery(sp_session *sess, const sp_audioformat *format,
 		usleep(5000);
 		return 0;
 	}
-
-	// printf("music_delivery; %d samples.", num_frames);
 
 	audio_fifo_data_t *afd = audio_data_create( num_frames, format->channels );
 
@@ -441,6 +417,7 @@ static int music_delivery(sp_session *sess, const sp_audioformat *format,
 
 	audio_fifo_queue(af, afd);
 	// free(afd);
+
 	return num_frames;
 }
 
@@ -482,7 +459,7 @@ static void metadata_updated(sp_session *sess)
  */
 static void play_token_lost(sp_session *sess)
 {
-	// audio_fifo_flush(&g_audiofifo);
+	audio_fifo_flush(&g_musicfifo);
 	// audio_fifo_flush(&g_audiofifo);
 	// audio_fifo_flush(&g_audiofifo);
 	// audio_fifo_flush(&g_audiofifo);
@@ -625,8 +602,8 @@ void tuner_debug() {
 
 void _hardware_event(int event) {
 	switch(event) {
-		case HE_FREQ_UP: tuner_tune_by(g_tuner, 1); tuner_debug(); break;
-		case HE_FREQ_DOWN: tuner_tune_by(g_tuner, -1); tuner_debug(); break;
+		case HE_FREQ_UP: tuner_tune_by(g_tuner, 10); tuner_debug(); break;
+		case HE_FREQ_DOWN: tuner_tune_by(g_tuner, -10); tuner_debug(); break;
 		case HE_CHANNEL1: tuner_goto(g_tuner, 0); tuner_debug(); break;
 		case HE_CHANNEL2: tuner_goto(g_tuner, 1); tuner_debug(); break;
 		case HE_CHANNEL3: tuner_goto(g_tuner, 2); tuner_debug(); break;
@@ -691,7 +668,7 @@ void gaplessloop(void *arg) {
 		}
 
 		if (!g_is_playing) {
-			// printf("gapless: not playing, generate silence.");
+			// printf("gapless: not playing, generate silence.\n");
 			audio_fifo_data_t *afd = audio_data_create(2048, 2);
 			audio_fifo_queue(&g_gaplessfifo, afd);
 			continue;
@@ -706,21 +683,23 @@ void gaplessloop(void *arg) {
 
 		audio_fifo_data_t *inp = audio_get(&g_musicfifo);
 		if (inp == NULL) {
-			// printf("gapless: nothing read.\n");
+			printf("gapless: nothing read.\n");
 			continue;
 		}
+
 
 		audio_fifo_data_t *afd = audio_data_create(inp->nsamples, inp->channels);
 		int16_t *ptr1 = afd->samples;
 		int16_t *ptr2 = inp->samples;
 		int i;
-		// printf("music data (%d samples x %d channels): ", inp->nsamples, inp->channels);
+		// printf("music data (%d samples x %d channels):\n", inp->nsamples, inp->channels);
 		for (i=0; i<inp->nsamples * inp->channels; i++) {
 			ptr1[i] = ptr2[i];
 		//	if (i<5) printf("%6d ", ptr2[i]);
 		}
 		// printf("  -> 0x%08X\n", afd);
 		audio_fifo_queue(&g_gaplessfifo, afd);
+
 		free(inp);
 	}
 }
@@ -768,6 +747,7 @@ void static3loop(void *arg) {
 	}
 }
 
+
 int main(int argc, char **argv)
 {
 	sp_session *sp;
@@ -777,6 +757,8 @@ int main(int argc, char **argv)
 	const char *password = NULL;
 	const char *serialdevice = NULL;
 	int opt;
+
+	mtrace();
 
 	while ((opt = getopt(argc, argv, "u:p:s:")) != EOF) {
 		switch (opt) {
@@ -808,8 +790,8 @@ int main(int argc, char **argv)
 	audio_fifo_reset(&g_gaplessfifo);
 	audio_fifo_reset(&g_staticfifo1);
 	audio_fifo_reset(&g_staticfifo2);
-	// audio_fifo_reset(&g_staticfifo3);
-
+	audio_fifo_reset(&g_audiofifo);
+	
 	printf("music fifo: %X\n", &g_musicfifo);
 	printf("gapless fifo: %X\n", &g_gaplessfifo);
 	printf("static1 fifo: %X\n", &g_staticfifo1);
@@ -870,6 +852,7 @@ int main(int argc, char **argv)
 	pthread_create(&id5, NULL, static3loop, NULL);
 
 	for (;;) {
+		// printf("In loop\n");
 		if (next_timeout == 0) {
 			while(!g_notify_do) {
 				pthread_cond_wait(&g_notify_cond, &g_notify_mutex);

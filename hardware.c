@@ -17,7 +17,10 @@ int fd = -1;
 
 void openport(char *name) {
 	if (name==NULL)
+ 	{
+		printf("HARDWARE: No serial.\n");
 		return;
+	}
 	printf("HARDWARE: Trying to open port \"%s\"...\n", name);
 	struct termios options;
 	fd = open(name, O_RDWR | O_NOCTTY | O_NDELAY); // List usbSerial devices using Terminal ls /dev/tty.*

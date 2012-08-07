@@ -184,7 +184,13 @@ static void* alsa_audio_start(void *aux)
 
 	for (;;) {
 		afd = audio_get(af);
+		// printf("%X\n", afd);
+		if (afd == NULL) {
+			usleep(100000);
+			continue;
+		}
 
+		usleep(1);
 		if (!h || cur_rate != afd->rate || cur_channels != afd->channels) {
 			if (h) snd_pcm_close(h);
 
@@ -209,6 +215,7 @@ static void* alsa_audio_start(void *aux)
 			snd_pcm_prepare(h);
 
 		snd_pcm_writei(h, afd->samples, afd->nsamples);
+
 		free(afd);
 	}
 }
@@ -222,8 +229,8 @@ void audio_init(audio_fifo_t *af)
 
   printf("ALSA audio initialized.\n");
 
-	pthread_mutex_init(&af->mutex, NULL);
-	pthread_cond_init(&af->cond, NULL);
+//	pthread_mutex_init(&af->mutex, NULL);
+//	pthread_cond_init(&af->cond, NULL);
 
 	pthread_create(&tid, NULL, alsa_audio_start, af);
 }

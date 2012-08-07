@@ -2,6 +2,8 @@
 #include "audio.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 typedef struct {
 	int vol;
@@ -51,8 +53,10 @@ void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t 
 
 	audio_fifo_data_t *infd = audio_get(inputfifo);
 	if (infd == NULL)
+ 	{
+		printf("static input ready.\n");
 		return;
-
+	}
 	// printf("Generating noise; samples=%d, channels=%d\n", infd->nsamples, infd->channels);
 	audio_fifo_data_t *afd = audio_data_create(infd->nsamples, infd->channels);
 

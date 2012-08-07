@@ -28,8 +28,10 @@
 #include "audio.h"
 #include <stdlib.h>
 #include <pthread.h>
+#include <stdio.h>
 
 void audio_fifo_reset(audio_fifo_t *af) {
+	printf("audio_fifo_reset %X\n", af);
     TAILQ_INIT(&af->q);
     af->qlen = 0;
     pthread_mutex_init(&af->mutex, NULL);
@@ -37,6 +39,7 @@ void audio_fifo_reset(audio_fifo_t *af) {
 }
 
 audio_fifo_data_t* audio_get(audio_fifo_t *af) {
+	// printf("audio_fifo_get %X\n", af);
     audio_fifo_data_t *afd = NULL;
     pthread_mutex_lock(&af->mutex);
     afd = TAILQ_FIRST(&af->q);
@@ -51,7 +54,7 @@ audio_fifo_data_t* audio_get(audio_fifo_t *af) {
 }
 
 void audio_fifo_flush(audio_fifo_t *af) {
-    printf("flush fifo %X\n", af);
+    printf("audio_flush_fifo %X\n", af);
     audio_fifo_data_t *afd;
     pthread_mutex_lock(&af->mutex);
     while ((afd = TAILQ_FIRST(&af->q))) {
@@ -82,7 +85,7 @@ audio_fifo_data_t *audio_data_create(int samples, int channels) {
 
 void audio_fifo_queue(audio_fifo_t *af, audio_fifo_data_t *afd) {
     pthread_mutex_lock(&af->mutex);
-    // printf("audio_fifo_queue( af=%X, afd=%X )\n", af, afd);
+    // printf("audio_fifo_queue %X data=%X\n", af, afd);
     TAILQ_INSERT_TAIL(&af->q, afd, link);
     af->qlen += afd->nsamples;// * afd->channels;
     // pthread_cond_signal(&af->cond);

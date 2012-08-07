@@ -40,7 +40,12 @@ static void* alsa_audio_start(void *aux)
 	audio_fifo_t *af = aux;
 
 	while(1)
-		free(audio_get(af));
+	{
+		void *o = audio_get(af);
+		if(o != NULL)
+			free(o);
+	}
+
 	return NULL;
 }
 
@@ -51,10 +56,10 @@ void audio_init(audio_fifo_t *af)
 	TAILQ_INIT(&af->q);
 	af->qlen = 0;
 
-  printf("Dummy audio initialized.\n");
+  	printf("Dummy audio initialized.\n");
 
-	pthread_mutex_init(&af->mutex, NULL);
-	pthread_cond_init(&af->cond, NULL);
+//	pthread_mutex_init(&af->mutex, NULL);
+//	pthread_cond_init(&af->cond, NULL);
 
 	pthread_create(&tid, NULL, alsa_audio_start, af);
 }

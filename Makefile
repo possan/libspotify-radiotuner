@@ -14,11 +14,14 @@ LDLIBS  = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs-only-l --
 AUDIO_DRIVER ?= alsa
 endif
 
+#AUDIO_DRIVER = dummy
+
 TARGET = jukebox
 ## TARGET = playtrack
 OBJS = $(TARGET).o appkey.o $(AUDIO_DRIVER)-audio.o audio.o tuner.o hardware.o statics.o
 
 $(TARGET): $(OBJS)
+	#$(CC) -ggdb -g3 -p $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 ifdef DEBUG
 ifeq ($(shell uname),Darwin)
