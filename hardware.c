@@ -36,6 +36,19 @@ void openport(char *name) {
 	options.c_cflag &= ~CSTOPB;
 	options.c_cflag &= ~CSIZE;
 	options.c_cflag |= CS8;
+
+    options.c_cflag &= ~CRTSCTS;
+
+  	options.c_cflag |= CREAD | CLOCAL;  // turn on READ & ignore ctrl lines
+    options.c_iflag &= ~(IXON | IXOFF | IXANY); // turn off s/w flow ctrl
+
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // make raw
+    options.c_oflag &= ~OPOST; // make raw
+
+    // see: http://unixwiz.net/techtips/termios-vmin-vtime.html
+    options.c_cc[VMIN]  = 0;
+    options.c_cc[VTIME] = 20;
+
 	tcsetattr(fd,TCSANOW,&options);
  	printf("HARDWARE: Connected.\n");
 }

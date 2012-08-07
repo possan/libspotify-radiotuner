@@ -533,7 +533,7 @@ static void track_ended(bool startNext) {
  * @param  progname  The program name
  */
 static void usage(const char *progname) {
-	fprintf(stderr, "usage: %s -u <username> -p <password>\n", progname);
+	fprintf(stderr, "usage: %s -u <username> -p <password> -s <serialdevice>\n", progname);
 }
 
 void peek_input() {

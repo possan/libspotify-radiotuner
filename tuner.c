@@ -42,9 +42,9 @@ void tuner_getstate(TUNER tunerid, struct tunerstate *output) {
 
 	output->freq = tuner->freq;
 	output->music_volume = .0f;
-	output->static_volume = scale_noise(pnoise((float)tuner->freq * 2.256f, tuner->perlin_random1, 85.0f));
-	output->static2_volume = scale_noise(pnoise((float)tuner->freq * 5.256f, tuner->perlin_random2, 30.0f));
-	output->static3_volume = scale_noise(pnoise((float)tuner->freq * 1.256f, tuner->perlin_random3, 0.0f));
+	output->static_volume = scale_noise(pnoise((float)tuner->freq * 0.256f, tuner->perlin_random1, 85.0f));
+	output->static2_volume = scale_noise(pnoise((float)tuner->freq * 0.356f, tuner->perlin_random2, 30.0f));
+	output->static3_volume = scale_noise(pnoise((float)tuner->freq * 0.456f, tuner->perlin_random3, 0.0f));
 	output->music_playlist_index = -1;
 	output->display_playlist_index = -1;
 	output->display_freq = (int)round((float)tuner->freq/10.0f) * 10;
