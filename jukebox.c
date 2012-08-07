@@ -803,16 +803,16 @@ int main(int argc, char **argv)
 	hardware_banner("welcome.", 200);
 	hardware_set_callback(_hardware_event);
 
-	g_static1 = static_init(BROWN_NOISE);
-	g_static2 = static_init(PINK_NOISE);
-	g_static3 = static_init(WHITE_NOISE);
+	g_static1 = static_init(BROWN_NOISE, "static1.raw");
+	g_static2 = static_init(PINK_NOISE, "static2.raw");
+	g_static3 = static_init(WHITE_NOISE, "static3.raw");
 
 	g_tuner = tuner_init();
 	tuner_addchannel(g_tuner, 130 + rand()%100, "Channel 1", "spotify:user:possan:playlist:4g17smZvFZqg4dN74XMBYH");
 	tuner_addchannel(g_tuner, 410 + rand()%100, "Channel 2", "spotify:user:possan:playlist:2BBVnBjG4Cynww1mnjfV0v");
 	tuner_addchannel(g_tuner, 700 + rand()%100, "Channel 3", "spotify:user:possan:playlist:72weZVptgKfYFyzafxBdO5");
 	tuner_goto(g_tuner, rand() % tuner_numchannels(g_tuner));
-	tuner_tune_by(g_tuner, -7 + rand()%15);
+	tuner_tune_by(g_tuner, -70 + rand()%150);
 
 	printf("Start loop...\n");
 

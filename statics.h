@@ -10,7 +10,7 @@ typedef unsigned long STATICSTATE;
 #define PINK_NOISE 13
 #define BROWN_NOISE 30
 
-extern STATICSTATE static_init(int color);
+extern STATICSTATE static_init(int color, char *filename);
 extern void static_setvolume(STATICSTATE statics, float volume);
 extern float static_getvolume(STATICSTATE statics);
 extern void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t *outputfifo, bool comped);

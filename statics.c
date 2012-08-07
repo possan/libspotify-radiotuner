@@ -14,21 +14,44 @@ typedef struct {
 	signed short *buf;
 } staticstate_private;
 
-STATICSTATE static_init(int color) {
+STATICSTATE static_init(int color, char *filename) {
 	staticstate_private *state = (staticstate_private *)malloc(sizeof(staticstate_private));
-	int len = 300000 + (rand()&65535);
-	int i, v = 0, c = 0;
-	state->offset = rand() % len;
-	state->length = len;
-	state->buf = malloc(2 * len);
-	for(i=0; i<len; i++) {
-		if (c==0)
-			v = (rand() & 8191) - 4096;
-		c ++;
-		if (c > color / 10) c = 0;
-		state->buf[i] = v;
-	}
+	FILE *f = fopen( filename, "rb" );
+	if (f) {
+		fseek( f, 0, SEEK_END );
+		int len = ftell(f) / 2;
+		int i;
+	
+		fseek( f, 0, SEEK_SET );
+		state->length = len;
+		state->buf = malloc(2 * len);
+		for( i=0; i<len; i++ ) {
+			unsigned short a;
+			fread( &a, 1,2 ,f );
+			// fread( &a, 1,2 ,f );
+			state->buf[i] = a;
+		}
+		// fread( state->buf, 2, len, f );		
 
+		fclose(f);
+	}
+	else {
+
+		int len = 300000 + (rand()&65535);
+		int i, v = 0, c = 0;
+		state->length = len;
+		state->buf = malloc(2 * len);
+		for(i=0; i<len; i++) {
+			if (c==0)
+				v = (rand() & 8191) - 4096;
+			c ++;
+			if (c > color / 10) c = 0;
+			state->buf[i] = v;
+		}
+	}
+	
+	state->offset = rand() % state->length;
+	
 	return (STATICSTATE)state;
 }
 
@@ -61,7 +84,7 @@ void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t 
 	audio_fifo_data_t *afd = audio_data_create(infd->nsamples, infd->channels);
 
 	o = state->offset;
-	for(i=0; i<afd->nsamples * afd->channels; i++) {
+	for(i=0; i<afd->nsamples * afd->channels; i+=2) {
 		x = infd->samples[i];
 		if (comped) {
 			x -= (x * state->vol) / 100000;
@@ -73,6 +96,7 @@ void static_generate(STATICSTATE statics, audio_fifo_t *inputfifo, audio_fifo_t 
 		if (x<-32767) x=-32767;
 		if (x>32767) x=32767;
 		afd->samples[i] = x;
+		afd->samples[i+1] = x;
 		o ++;
 		if (o > state->length) o=0;
 		if (state->vol < state->targetvol) state->vol++;
